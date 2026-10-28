@@ -16,6 +16,8 @@ export interface PersonDayStatus {
   formOk?: boolean;
   /** 應交相簿張數；0＝無需相簿 */
   albumNeed?: number;
+  /** 已按「我已上傳」次數 */
+  albumReported?: number;
 }
 
 type FlexBubble = messagingApi.FlexBubble;
@@ -47,8 +49,12 @@ export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadlin
       };
     }
     const form = p.formOk ? '表單 ✔' : '表單 ✘';
-    const album =
-      (p.albumNeed ?? 0) <= 0 ? '無需相簿' : `相簿 ${p.albumNeed}張`;
+    const need = p.albumNeed ?? 0;
+    const reported = p.albumReported ?? 0;
+    let album: string;
+    if (need <= 0) album = '無需相簿';
+    else if (reported > 0) album = `相簿 ✔（應交${need}張）`;
+    else album = `相簿 ${need}張`;
     return {
       type: 'box', layout: 'vertical', margin: 'md', contents: [
         { type: 'text', text: p.person, weight: 'bold', size: 'sm' },
@@ -81,7 +87,7 @@ export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadlin
       type: 'box', layout: 'vertical', spacing: 'sm', contents: [
         {
           type: 'button', style: 'primary', color: '#2E7D32',
-          action: { type: 'postback', label: '我已上傳', data: `action=${UPLOAD_ACTION}&date=${day}`, displayText: '我已上傳' },
+          action: { type: 'postback', label: '我已上傳', data: `action=${UPLOAD_ACTION}&date=${day}` },
         },
         { type: 'text', text: '傳完相簿後點一下', size: 'xs', color: '#888888', align: 'center' },
       ],
@@ -89,7 +95,7 @@ export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadlin
   };
 
   return [
-    { type: 'text', text: '以下是今日應交清單，請大家確認上傳喔！' },
+    { type: 'text', text: '以下是今日應交清單，請大家確認上傳。' },
     { type: 'flex', altText: `今日應交清單 | ${md}`, contents: bubble },
   ];
 }

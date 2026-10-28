@@ -33,12 +33,14 @@ async function handle(ev: webhook.Event) {
   if (ev.type === 'postback') {
     const p = new URLSearchParams(ev.postback.data);
     if (p.get('action') === UPLOAD_ACTION) {
+      // 一律不回覆；已回報過再按＝防誤觸，直接忽略
       const day = p.get('date') ?? yesterday;
-      if (new Date() >= deadlineOf(settlementDayFor(day))) return reply(ev.replyToken!, `${day} 已過截止，回報不計（不可補交免罰）`);
+      if (new Date() >= deadlineOf(settlementDayFor(day))) return;
       const person = store.personOf(uid);
-      if (!person) return reply(ev.replyToken!, '尚未綁定暱稱，請私訊制裁者：綁定 你的暱稱');
+      if (!person) return;
+      if ((store.albumCounts(day).get(person) ?? 0) > 0) return;
       store.addAlbum(day, person, uid);
-      return reply(ev.replyToken!, `${person} ${day} 已記錄上傳 ${store.albumCounts(day).get(person)} 次`);
+      return;
     }
   }
   if (ev.type === 'message' && ev.message.type === 'text' && ev.source?.type === 'user') {
@@ -58,22 +60,27 @@ app.post('/webhook', middleware({ channelSecret: config.lineSecret || 'dummy' })
   await Promise.all((req.body.events as webhook.Event[]).map(e => handle(e).catch(err => console.error(err))));
   res.sendStatus(200);
 });
-// TODO: 提醒時間待定（暫訂 09:00 平日）
-cron.schedule('0 9 * * 1-5', async () => {
+async function sendRemind() {
   const y = addDays(toTaipeiYMD(new Date()), -1);
-  try {
-    const [roster, responses, deals] = await Promise.all([reader.roster(), reader.formResponses(), reader.deals().catch(() => [])]);
-    const leave = store.leaveSet(y);
-    const valid = validResponses(responses, y);
-    const off = new Set([...leave, ...valid.filter(r => r.status === 'off').map(r => r.person)]);
-    const submitted = new Set(valid.filter(r => r.status === 'work').map(r => r.person));
-    const req = requiredAlbums(deals, y);
-    const people = (roster.length ? roster : INITIAL_ROSTER).map(person => {
-      if (off.has(person)) return { person, leave: true };
-      return { person, formOk: submitted.has(person), albumNeed: req.get(person) ?? 0 };
-    });
-    await pushGroup(remindChecklistFlex(y, people, '13:00'));
-  } catch (e) { console.error('remind failed', e); }
-}, { timezone: TZ });
+  const [roster, responses, deals] = await Promise.all([reader.roster(), reader.formResponses(), reader.deals().catch(() => [])]);
+  const leave = store.leaveSet(y);
+  const valid = validResponses(responses, y);
+  const off = new Set([...leave, ...valid.filter(r => r.status === 'off').map(r => r.person)]);
+  const submitted = new Set(valid.filter(r => r.status === 'work').map(r => r.person));
+  const req = requiredAlbums(deals, y);
+  const albumDone = store.albumCounts(y);
+  const people = (roster.length ? roster : INITIAL_ROSTER).map(person => {
+    if (off.has(person)) return { person, leave: true };
+    const need = req.get(person) ?? 0;
+    const reported = albumDone.get(person) ?? 0;
+    // 已按過「我已上傳」則 checklist 顯示已交張數感：need 用 max(0, need-reported) 不改 schema，改 formOk/album 文案在 messages
+    return { person, formOk: submitted.has(person), albumNeed: need, albumReported: reported };
+  });
+  await pushGroup(remindChecklistFlex(y, people, '13:00'));
+}
+// 12:00 / 12:30 / 12:50 提醒；13:00 只結算（不提醒）
+for (const expr of ['0 12 * * 1-5', '30 12 * * 1-5', '50 12 * * 1-5']) {
+  cron.schedule(expr, () => { sendRemind().catch(e => console.error('remind failed', e)); }, { timezone: TZ });
+}
 cron.schedule(config.cron, () => { runSettlement(store, reader).catch(console.error); }, { timezone: TZ });
 app.listen(config.port, () => console.log(`listening :${config.port} (sheets=${config.sheetsMode})`));
