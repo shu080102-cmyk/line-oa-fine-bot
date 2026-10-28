@@ -33,11 +33,13 @@ async function handle(ev: webhook.Event) {
   if (ev.type === 'postback') {
     const p = new URLSearchParams(ev.postback.data);
     if (p.get('action') === UPLOAD_ACTION) {
-      // 一律不回覆；已回報過再按＝防誤觸，直接忽略
+      // 一律不回覆。只有按鈕上的那個人（已綁定且吻合）可記；已回報／別人亂按＝丟棄
       const day = p.get('date') ?? yesterday;
+      const target = p.get('person');
+      if (!target) return;
       if (new Date() >= deadlineOf(settlementDayFor(day))) return;
       const person = store.personOf(uid);
-      if (!person) return;
+      if (!person || person !== target) return;
       if ((store.albumCounts(day).get(person) ?? 0) > 0) return;
       store.addAlbum(day, person, uid);
       return;

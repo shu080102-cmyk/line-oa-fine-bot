@@ -63,40 +63,77 @@ export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadlin
     };
   });
 
-  const bubble: FlexBubble = {
-    type: 'bubble',
-    body: {
-      type: 'box', layout: 'vertical', contents: [
-        {
-          type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: '📋', flex: 0, size: 'lg' },
-            { type: 'text', text: `今日應交清單 | ${md}`, weight: 'bold', size: 'md', color: '#1B5E20', margin: 'sm', wrap: true },
-          ],
-        },
-        {
-          type: 'box', layout: 'horizontal', margin: 'md', contents: [
-            { type: 'text', text: '⏰', flex: 0, size: 'sm' },
-            { type: 'text', text: `截止 ${deadline}`, size: 'sm', color: '#666666', margin: 'sm' },
-          ],
-        },
-        sep(),
-        ...rows,
-      ],
-    },
-    footer: {
-      type: 'box', layout: 'vertical', spacing: 'sm', contents: [
-        {
-          type: 'button', style: 'primary', color: '#2E7D32',
-          action: { type: 'postback', label: '我已上傳', data: `action=${UPLOAD_ACTION}&date=${day}` },
-        },
-        { type: 'text', text: '傳完相簿後點一下', size: 'xs', color: '#888888', align: 'center' },
-      ],
-    },
+  // 只有應交相簿且尚未回報的人有按鈕；label/displayText＝暱稱，別人按了 handler 會丟棄
+  const pendingAlbum = people.filter(
+    p => !p.leave && (p.albumNeed ?? 0) > 0 && (p.albumReported ?? 0) <= 0,
+  );
+
+  const mkBubble = (footerPeople: PersonDayStatus[], withHeader: boolean): FlexBubble => {
+    const footerContents: FlexComponent[] = footerPeople.map(p => ({
+      type: 'button',
+      style: 'primary',
+      color: '#2E7D32',
+      action: {
+        type: 'postback',
+        label: p.person.slice(0, 20),
+        data: `action=${UPLOAD_ACTION}&date=${day}&person=${encodeURIComponent(p.person)}`,
+        displayText: p.person,
+      },
+    }));
+    if (footerPeople.length) {
+      footerContents.push({ type: 'text', text: '應交相簿的人點自己的名字', size: 'xs', color: '#888888', align: 'center' });
+    } else if (withHeader) {
+      footerContents.push({ type: 'text', text: '今日無需相簿回報', size: 'xs', color: '#888888', align: 'center' });
+    }
+    const bodyContents: FlexComponent[] = withHeader
+      ? [
+          {
+            type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '📋', flex: 0, size: 'lg' },
+              { type: 'text', text: `今日應交清單 | ${md}`, weight: 'bold', size: 'md', color: '#1B5E20', margin: 'sm', wrap: true },
+            ],
+          },
+          {
+            type: 'box', layout: 'horizontal', margin: 'md', contents: [
+              { type: 'text', text: '⏰', flex: 0, size: 'sm' },
+              { type: 'text', text: `截止 ${deadline}`, size: 'sm', color: '#666666', margin: 'sm' },
+            ],
+          },
+          sep(),
+          ...rows,
+        ]
+      : [
+          { type: 'text', text: '應交相簿（續）', weight: 'bold', size: 'sm', color: '#1B5E20' },
+        ];
+    const bubble: FlexBubble = {
+      type: 'bubble',
+      body: { type: 'box', layout: 'vertical', contents: bodyContents },
+    };
+    if (footerContents.length) {
+      bubble.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: footerContents };
+    }
+    return bubble;
   };
+
+  // LINE 單一 bubble footer 按鈕不宜太多：每卡最多 8 人
+  const chunk = 8;
+  const bubbles: FlexBubble[] = [];
+  if (!pendingAlbum.length) {
+    bubbles.push(mkBubble([], true));
+  } else {
+    for (let i = 0; i < pendingAlbum.length; i += chunk) {
+      bubbles.push(mkBubble(pendingAlbum.slice(i, i + chunk), i === 0));
+    }
+  }
+
+  const flexContents =
+    bubbles.length === 1
+      ? bubbles[0]
+      : { type: 'carousel' as const, contents: bubbles };
 
   return [
     { type: 'text', text: '以下是今日應交清單，請大家確認上傳。' },
-    { type: 'flex', altText: `今日應交清單 | ${md}`, contents: bubble },
+    { type: 'flex', altText: `今日應交清單 | ${md}`, contents: flexContents },
   ];
 }
 
