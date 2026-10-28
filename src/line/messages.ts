@@ -1,7 +1,9 @@
 import { messagingApi } from '@line/bot-sdk';
 import { Fine, YMD } from '../domain/types';
 
+import { SET_DEAL_TAB_ACTION } from './admin';
 export const UPLOAD_ACTION = 'album_uploaded';
+export { SET_DEAL_TAB_ACTION };
 
 /** YYYY-MM-DD → M/D */
 export function toMD(day: YMD): string {
@@ -230,4 +232,37 @@ export function settlementsFromFines(days: YMD[], fines: Fine[]): messagingApi.M
     });
     return settlementFlex(day, formMissing, albumMissing);
   });
+}
+
+
+/** 管理員：選生客試算表分頁 */
+export function dealTabPickerFlex(current: string, tabs: string[]): messagingApi.Message {
+  const buttons: FlexComponent[] = tabs.slice(0, 12).map(tab => ({
+    type: 'button',
+    style: tab === current ? 'primary' : 'secondary',
+    color: tab === current ? '#2E7D32' : undefined,
+    action: {
+      type: 'postback',
+      label: tab.slice(0, 20),
+      data: `action=${SET_DEAL_TAB_ACTION}&tab=${encodeURIComponent(tab)}`,
+      displayText: `分頁 ${tab}`,
+    },
+  }));
+  return {
+    type: 'flex',
+    altText: `選生客分頁（目前：${current}）`,
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box', layout: 'vertical', contents: [
+          { type: 'text', text: '生客表分頁', weight: 'bold', size: 'md', color: '#1B5E20' },
+          { type: 'text', text: `目前：${current}`, size: 'sm', color: '#555555', margin: 'md', wrap: true },
+          { type: 'text', text: '點下面一個換成當月分頁', size: 'xs', color: '#888888', margin: 'sm', wrap: true },
+        ],
+      },
+      footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: buttons.length ? buttons : [
+        { type: 'text', text: '找不到分頁', size: 'sm', color: '#999999' },
+      ] },
+    },
+  };
 }
