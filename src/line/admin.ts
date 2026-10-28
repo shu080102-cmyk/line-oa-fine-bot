@@ -45,9 +45,10 @@ export const SET_DEAL_TAB_ACTION = 'set_deal_tab';
 export function albumCheckText(md: string, need: Map<string, number>, reported: Map<string, number>, off: Set<string>): string {
   const ppl = [...need.entries()].filter(([p, n]) => n > 0 && !off.has(p));
   const pressed = ppl.filter(([p]) => (reported.get(p) ?? 0) > 0).map(([p]) => p);
+  if (!ppl.length) return `相簿檢查 | ${md}\n\n今日無人需交相簿（週末或全員休假）。`;
   const notYet = ppl.filter(([p]) => !(reported.get(p) ?? 0)).map(([p]) => p);
   return [`相簿檢查 | ${md}`, '',
-    `應交相簿：${ppl.map(([p, n]) => `${p}(${n})`).join('、') || '無'}`,
+    `應交相簿（平日上班者都要交）：${ppl.map(([p, n]) => `${p}(${n})`).join('、') || '無'}`,
     `已按上傳：${pressed.join('、') || '無'}`,
     `尚未按：${notYet.join('、') || '無'}`, '',
     '請到相簿實際核對；有按但沒真的傳，回覆：未傳 暱稱（例：未傳 小布）。14:00 結算。'].join('\n');

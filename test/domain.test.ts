@@ -19,15 +19,21 @@ describe('fines', () => {
   const base = { day: '2026-10-27', roster: ['小布','小玫','小紅'], deals: [], leave: new Set<string>(), albumReports: new Map<string, number>() };
   it('missing form fined; 休假 and leave exempt', () => {
     const f = calcDayFines({ ...base, leave: new Set(['小紅']), responses: [{ timestamp: T('2026-10-27T20:00:00'), person: '小玫', status: 'off', rawStatus: '' }] }, amt);
-    expect(f.map(x => x.person)).toEqual(['小布']);
+    expect([...new Set(f.map(x => x.person))]).toEqual(['小布']);
+    expect(f.map(x => x.reason).sort()).toEqual(['album','form']);
   });
   it('late submit still fined', () => {
     const f = calcDayFines({ ...base, roster: ['小布'], responses: [{ timestamp: T('2026-10-28T14:05:00'), person: '小布', status: 'work', rawStatus: '' }] }, amt);
-    expect(f).toHaveLength(1);
+    expect(f.map(x => x.reason)).toEqual(['form','album']);
+  });
+  it('album reported once = ok even with 2 生; weekend exempt', () => {
+    const deals = [{ date: '2026-10-27', person: '小布', isNewCustomer: true }, { date: '2026-10-27', person: '小布', isNewCustomer: true }];
+    expect(calcDayFines({ ...base, roster: ['小布'], responses: [], deals, albumReports: new Map([['小布', 1]]) }, amt).map(x => x.reason)).toEqual(['form']);
+    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [] }, amt)).toEqual([]);
   });
   it('form + album stack', () => {
     const deals = [{ date: '2026-10-27', person: '小布', isNewCustomer: true }, { date: '2026-10-27', person: '小布', isNewCustomer: true }];
-    const f = calcDayFines({ ...base, roster: ['小布'], responses: [], deals, albumReports: new Map([['小布', 1]]) }, amt);
+    const f = calcDayFines({ ...base, roster: ['小布'], responses: [], deals, albumReports: new Map() }, amt);
     expect(f.map(x => x.reason).sort()).toEqual(['album','form']);
   });
 });

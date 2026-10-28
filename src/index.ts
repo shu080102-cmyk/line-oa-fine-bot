@@ -2,7 +2,7 @@ import express from 'express';
 import { middleware, webhook } from '@line/bot-sdk';
 import cron from 'node-cron';
 import { config, TZ, INITIAL_ROSTER, DEAL_SHEET } from './config';
-import { requiredAlbums, validResponses } from './domain/fines';
+import { albumNeeds, validResponses } from './domain/fines';
 import { addDays, toTaipeiYMD, deadlineOf, settlementDayFor } from './domain/time';
 import { HELP, parseAdmin, albumCheckText, SET_DEAL_TAB_ACTION } from './line/admin';
 import { lineClient, pushGroup, pushAdmin } from './line/client';
@@ -107,10 +107,11 @@ async function sendRemind(adminOnly = false) {
   const valid = validResponses(responses, y);
   const off = new Set([...leave, ...valid.filter(r => r.status === 'off').map(r => r.person)]);
   const submitted = new Set(valid.filter(r => r.status === 'work').map(r => r.person));
-  const req = requiredAlbums(deals, y);
+  const rosterList = roster.length ? roster : INITIAL_ROSTER;
+  const req = albumNeeds(rosterList, off, deals, y);
   const albumDone = store.albumCounts(y);
   // 全員仍列在清單（表單 ✔/✘＋相簿）；只有應交相簿者底下才有名字按鈕
-  const people = (roster.length ? roster : INITIAL_ROSTER).map(person => {
+  const people = rosterList.map(person => {
     if (off.has(person)) return { person, leave: true };
     const need = req.get(person) ?? 0;
     const reported = albumDone.get(person) ?? 0;
