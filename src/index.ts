@@ -105,10 +105,10 @@ async function sendRemind() {
     const reported = albumDone.get(person) ?? 0;
     return { person, formOk: submitted.has(person), albumNeed: need, albumReported: reported };
   });
-  await pushGroup(remindChecklistFlex(y, people, '13:00'));
+  await pushGroup(remindChecklistFlex(y, people, '14:00'));
 }
-// 12:00 / 12:30 / 12:50 提醒；13:00 只結算（不提醒）
-for (const expr of ['0 12 * * 1-5', '30 12 * * 1-5', '50 12 * * 1-5']) {
+// 12:00 / 13:00 提醒；14:00 只結算（不提醒）
+for (const expr of ['0 12 * * 1-5', '0 13 * * 1-5']) {
   cron.schedule(expr, () => { sendRemind().catch(e => console.error('remind failed', e)); }, { timezone: TZ });
 }
 cron.schedule(config.cron, () => { runSettlement(store, reader).catch(console.error); }, { timezone: TZ });

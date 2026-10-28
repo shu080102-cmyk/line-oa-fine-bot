@@ -39,7 +39,7 @@ function bullet(text: string, color = '#333333'): FlexComponent {
 }
 
 /** 早上／盤點：今日應交清單（版面比照成交小幫手，發送帳＝制裁者 OA） */
-export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadline = '13:00'): messagingApi.Message[] {
+export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadline = '14:00'): messagingApi.Message[] {
   const md = toMD(day);
   const rows: FlexComponent[] = people.map(p => {
     if (p.leave) {
@@ -139,18 +139,18 @@ export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadlin
   ];
 }
 
-/** 13:00 結算卡片 */
+/** 14:00 結算卡片 */
 export function settlementFlex(day: YMD, formMissing: string[], albumMissing: { person: string; need: number }[]): messagingApi.Message {
   const md = toMD(day);
   if (!formMissing.length && !albumMissing.length) {
     return {
       type: 'flex',
-      altText: `13:00 結算 | ${md}：全員達標`,
+      altText: `14:00 結算 | ${md}：全員達標`,
       contents: {
         type: 'bubble',
         body: {
           type: 'box', layout: 'vertical', contents: [
-            { type: 'text', text: `✅ 「13:00 結算 | ${md}」`, weight: 'bold', size: 'md', color: '#2E7D32', wrap: true },
+            { type: 'text', text: `✅ 「14:00 結算 | ${md}」`, weight: 'bold', size: 'md', color: '#2E7D32', wrap: true },
             { type: 'text', text: '全員達標，無罰款', size: 'sm', margin: 'md', color: '#555555' },
           ],
         },
@@ -162,7 +162,7 @@ export function settlementFlex(day: YMD, formMissing: string[], albumMissing: { 
     {
       type: 'box', layout: 'horizontal', contents: [
         { type: 'text', text: '⚠️', flex: 0, size: 'lg' },
-        { type: 'text', text: `「13:00 結算 | ${md}」`, weight: 'bold', size: 'md', color: '#C62828', margin: 'sm', wrap: true },
+        { type: 'text', text: `「14:00 結算 | ${md}」`, weight: 'bold', size: 'md', color: '#C62828', margin: 'sm', wrap: true },
       ],
     },
     { type: 'separator', margin: 'md', color: '#E53935' },
@@ -205,7 +205,7 @@ export function settlementFlex(day: YMD, formMissing: string[], albumMissing: { 
     },
   };
 
-  return { type: 'flex', altText: `13:00 結算 | ${md}`, contents: bubble };
+  return { type: 'flex', altText: `14:00 結算 | ${md}`, contents: bubble };
 }
 
 /** @deprecated 保留給舊呼叫；改用 settlementFlex */

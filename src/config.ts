@@ -11,7 +11,7 @@ export const config = {
   fineForm: Number(e.FINE_FORM ?? 500),
   fineAlbum: Number(e.FINE_ALBUM ?? 500),
   sheetsMode: (e.SHEETS_MODE ?? 'stub') as 'stub' | 'google',
-  cron: e.SETTLEMENT_CRON ?? '0 13 * * 1-5',
+  cron: e.SETTLEMENT_CRON ?? '0 14 * * 1-5',
   dataFile: e.DATA_FILE ?? './data/store.json',
 };
 export const TZ = 'Asia/Taipei';
