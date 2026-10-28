@@ -9,6 +9,7 @@ interface Data {
   users: Record<string, string>;
   /** 生客表目前使用的分頁名；空＝用 env DEAL_SHEET_TAB */
   dealSheetTab?: string;
+  remindHeaderUrl?: string;
   /** 罰款群 groupId 覆寫；空＝用 env LINE_FINE_GROUP_ID */
   fineGroupId?: string;
 }
@@ -30,6 +31,8 @@ export class Store {
   markSettled(d: YMD) { this.d.settled.push(d); this.save(); }
   getDealSheetTab() { return this.d.dealSheetTab; }
   setDealSheetTab(tab: string) { this.d.dealSheetTab = tab; this.save(); }
+  getRemindHeaderUrl() { return this.d.remindHeaderUrl; }
+  setRemindHeaderUrl(url?: string) { if (url) this.d.remindHeaderUrl = url; else delete this.d.remindHeaderUrl; this.save(); }
   getFineGroupId() { return this.d.fineGroupId; }
   setFineGroupId(id: string) { this.d.fineGroupId = id; this.save(); }
 }

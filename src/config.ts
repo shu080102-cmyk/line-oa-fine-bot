@@ -1,6 +1,7 @@
 import 'dotenv/config';
 const e = process.env;
 export const config = {
+  publicBaseUrl: (e.PUBLIC_BASE_URL ?? 'https://line-fine-bot.onrender.com').replace(/\/+$/, ''),
   port: Number(e.PORT ?? 3000),
   lineSecret: e.LINE_CHANNEL_SECRET ?? '',
   lineToken: e.LINE_CHANNEL_ACCESS_TOKEN ?? '',

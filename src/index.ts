@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import { middleware, webhook } from '@line/bot-sdk';
 import cron from 'node-cron';
 import { config, TZ, INITIAL_ROSTER, DEAL_SHEET } from './config';
@@ -10,12 +11,26 @@ import { toMD, remindChecklistFlex, dealTabPickerFlex, UPLOAD_ACTION } from './l
 import { reader, listDealTabs, setDealTabGetter, currentDealTab } from './sheets';
 import { Store } from './store';
 import { runSettlement } from './jobs/settlement';
+import { REMIND_HEADER_PLATE_B64 } from './assets/remind-header-plate.b64';
+import fs from 'fs';
+
+// Ensure header plate exists on disk for /assets static (embedded so deploy doesn't need binary in git)
+(() => {
+  const dir = path.join(__dirname, '../public/assets');
+  const file = path.join(dir, 'remind-header-plate.png');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(file)) fs.writeFileSync(file, Buffer.from(REMIND_HEADER_PLATE_B64, 'base64'));
+  } catch (e) { console.error('header plate write failed', e); }
+})();
 
 const store = new Store();
 setDealTabGetter(() => store.getDealSheetTab() || DEAL_SHEET.tab);
 setFineGroupGetter(() => store.getFineGroupId() || config.fineGroupId);
 
 const app = express();
+app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
+const remindHeaderUrl = () => store.getRemindHeaderUrl() || `${config.publicBaseUrl}/assets/remind-header-plate.png`;
 const reply = (token: string, text: string) => lineClient.replyMessage({ replyToken: token, messages: [{ type: 'text', text }] });
 const replyMsgs = (token: string, messages: Parameters<typeof lineClient.replyMessage>[0]['messages']) =>
   lineClient.replyMessage({ replyToken: token, messages });
@@ -86,6 +101,9 @@ async function handle(ev: webhook.Event) {
       return reply(ev.replyToken!, `已撤回 ${c.person} ${d} 相簿回報（${n} 筆）` + (fined ? `，已記相簿罰 ${config.fineAlbum}` : store.isSettled(d) ? '，該日已有相簿罰' : `，14:00 結算會罰 ${config.fineAlbum}`));
     }
     if (c.kind === 'list') { const fs = store.fines(c.date); return reply(ev.replyToken!, fs.map(f => `${f.date} ${f.person} ${f.reason} ${f.amount}`).join('\n') || '無紀錄'); }
+    if (c.kind === 'header_get') return reply(ev.replyToken!, `提醒卡頭圖：${remindHeaderUrl()}`);
+    if (c.kind === 'header_set') { store.setRemindHeaderUrl(c.url); return reply(ev.replyToken!, `提醒卡頭圖已換成：${c.url}`); }
+    if (c.kind === 'header_clear') { store.setRemindHeaderUrl(undefined); return reply(ev.replyToken!, `提醒卡頭圖已恢復預設：${remindHeaderUrl()}`); }
     if (c.kind === 'fine_group_get') return reply(ev.replyToken!, `罰款群：${currentFineGroupId() || '（未設定，退回員工群）'}`);
     if (c.kind === 'fine_group_set') { store.setFineGroupId(c.groupId); console.log('========== [LINE] FINE_GROUP_SET groupId=' + c.groupId + ' =========='); return reply(ev.replyToken!, `罰款群已設為：${c.groupId}`); }
     if (c.kind === 'tab_set') {
@@ -127,7 +145,7 @@ async function sendRemind(adminOnly = false) {
     return { person, formOk: submitted.has(person), albumNeed: need, albumReported: reported };
   });
   if (adminOnly) return pushAdmin([{ type: 'text', text: albumCheckText(toMD(y), req, albumDone, off) }]);
-  await pushGroup(remindChecklistFlex(y, people, '14:00'));
+  await pushGroup(remindChecklistFlex(y, people, '14:00', { headerImageUrl: remindHeaderUrl() }));
 }
 // 12:00 / 13:00 提醒；14:00 只結算（不提醒）
 for (const expr of ['0 12 * * 1-5', '0 13 * * 1-5']) {
