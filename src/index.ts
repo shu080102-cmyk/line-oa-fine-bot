@@ -4,9 +4,9 @@ import cron from 'node-cron';
 import { config, TZ, INITIAL_ROSTER, DEAL_SHEET } from './config';
 import { requiredAlbums, validResponses } from './domain/fines';
 import { addDays, toTaipeiYMD, deadlineOf, settlementDayFor } from './domain/time';
-import { HELP, parseAdmin, SET_DEAL_TAB_ACTION } from './line/admin';
-import { lineClient, pushGroup } from './line/client';
-import { remindChecklistFlex, dealTabPickerFlex, UPLOAD_ACTION } from './line/messages';
+import { HELP, parseAdmin, albumCheckText, SET_DEAL_TAB_ACTION } from './line/admin';
+import { lineClient, pushGroup, pushAdmin } from './line/client';
+import { toMD, remindChecklistFlex, dealTabPickerFlex, UPLOAD_ACTION } from './line/messages';
 import { reader, listDealTabs, setDealTabGetter, currentDealTab } from './sheets';
 import { Store } from './store';
 import { runSettlement } from './jobs/settlement';
@@ -67,6 +67,17 @@ async function handle(ev: webhook.Event) {
     if (c.kind === 'help' || c.kind === 'unknown') return reply(ev.replyToken!, HELP);
     if (c.kind === 'leave') { const d = c.date ?? yesterday; store.addLeave(d, c.person); return reply(ev.replyToken!, `已登記 ${c.person} ${d} 請假`); }
     if (c.kind === 'fine') { const d = c.date ?? yesterday; store.addFine({ date: d, person: c.person, reason: 'manual', amount: c.amount, note: c.note, createdAt: new Date().toISOString() }); return reply(ev.replyToken!, `已記 ${c.person} ${d} 罰款 ${c.amount}${c.note ? '（' + c.note + '）' : ''}`); }
+    if (c.kind === 'not_uploaded') {
+      const d = c.date ?? yesterday;
+      const n = store.clearAlbum(d, c.person);
+      // 未結算：清掉回報即可，14:00 結算會自動罰；已結算：補記相簿罰（避免重複）
+      let fined = false;
+      if (store.isSettled(d) && !store.fines(d).some(f => f.person === c.person && f.reason === 'album')) {
+        store.addFine({ date: d, person: c.person, reason: 'album', amount: config.fineAlbum, note: '檢查：有按未傳', createdAt: new Date().toISOString() });
+        fined = true;
+      }
+      return reply(ev.replyToken!, `已撤回 ${c.person} ${d} 相簿回報（${n} 筆）` + (fined ? `，已記相簿罰 ${config.fineAlbum}` : store.isSettled(d) ? '，該日已有相簿罰' : `，14:00 結算會罰 ${config.fineAlbum}`));
+    }
     if (c.kind === 'list') { const fs = store.fines(c.date); return reply(ev.replyToken!, fs.map(f => `${f.date} ${f.person} ${f.reason} ${f.amount}`).join('\n') || '無紀錄'); }
     if (c.kind === 'tab_set') {
       store.setDealSheetTab(c.tab);
@@ -89,7 +100,7 @@ app.post('/webhook', middleware({ channelSecret: config.lineSecret || 'dummy' })
   await Promise.all((req.body.events as webhook.Event[]).map(e => handle(e).catch(err => console.error(err))));
   res.sendStatus(200);
 });
-async function sendRemind() {
+async function sendRemind(toAdmin = false) {
   const y = addDays(toTaipeiYMD(new Date()), -1);
   const [roster, responses, deals] = await Promise.all([reader.roster(), reader.formResponses(), reader.deals().catch(() => [])]);
   const leave = store.leaveSet(y);
@@ -105,11 +116,12 @@ async function sendRemind() {
     const reported = albumDone.get(person) ?? 0;
     return { person, formOk: submitted.has(person), albumNeed: need, albumReported: reported };
   });
+  if (toAdmin) await pushAdmin([{ type: 'text', text: albumCheckText(toMD(y), req, albumDone, off) }]).catch(e => console.error('pushAdmin failed', e));
   await pushGroup(remindChecklistFlex(y, people, '14:00'));
 }
 // 12:00 / 13:00 提醒；14:00 只結算（不提醒）
-for (const expr of ['0 12 * * 1-5', '0 13 * * 1-5']) {
-  cron.schedule(expr, () => { sendRemind().catch(e => console.error('remind failed', e)); }, { timezone: TZ });
-}
+// 13:00 另私訊管理員相簿檢查清單
+cron.schedule('0 12 * * 1-5', () => { sendRemind().catch(e => console.error('remind failed', e)); }, { timezone: TZ });
+cron.schedule('0 13 * * 1-5', () => { sendRemind(true).catch(e => console.error('remind failed', e)); }, { timezone: TZ });
 cron.schedule(config.cron, () => { runSettlement(store, reader).catch(console.error); }, { timezone: TZ });
 app.listen(config.port, () => console.log(`listening :${config.port} (sheets=${config.sheetsMode} dealTab=${currentDealTab()})`));

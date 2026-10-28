@@ -19,6 +19,7 @@ export class Store {
   personOf(userId: string) { return this.d.users[userId]; }
   addAlbum(date: YMD, person: string, userId: string) { this.d.albums.push({ date, person, userId, at: new Date().toISOString() }); this.save(); }
   albumCounts(date: YMD) { const m = new Map<string, number>(); for (const a of this.d.albums) if (a.date === date) m.set(a.person, (m.get(a.person) ?? 0) + 1); return m; }
+  clearAlbum(date: YMD, person: string) { const n = this.d.albums.length; this.d.albums = this.d.albums.filter(a => !(a.date === date && a.person === person)); this.save(); return n - this.d.albums.length; }
   addLeave(date: YMD, person: string) { this.d.leave.push({ date, person }); this.save(); }
   leaveSet(date: YMD) { return new Set(this.d.leave.filter(l => l.date === date).map(l => l.person)); }
   addFine(f: Omit<Fine, 'id'>) { const x = { ...f, id: randomUUID() }; this.d.fines.push(x); this.save(); return x; }
