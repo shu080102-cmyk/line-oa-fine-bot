@@ -21,18 +21,18 @@ describe('fines', () => {
   it('missing form fined; 休假 and leave exempt from form only', () => {
     const f = calcDayFines({ ...base, leave: new Set(['小紅']), responses: [{ timestamp: T('2026-10-27T20:00:00'), person: '小玫', status: 'off', rawStatus: '' }] }, amt);
     expect(f.filter(x => x.reason === 'form').map(x => x.person)).toEqual(['小布']);
-    expect(f.filter(x => x.reason === 'album').map(x => x.person).sort()).toEqual(['小布','小玫','小紅'].sort());
+    expect(f.filter(x => x.reason === 'album')).toEqual([]); // 無生不罰相簿
   });
   it('late submit still fined', () => {
-    const f = calcDayFines({ ...base, roster: ['小布'], responses: [{ timestamp: T('2026-10-28T14:05:00'), person: '小布', status: 'work', rawStatus: '' }] }, amt);
+    const f = calcDayFines({ ...base, roster: ['小布'], deals: [{ date: '2026-10-27', person: '小布', isNewCustomer: true }], responses: [{ timestamp: T('2026-10-28T14:05:00'), person: '小布', status: 'work', rawStatus: '' }] }, amt);
     expect(f.map(x => x.reason)).toEqual(['form','album']);
   });
   it('album reported once = ok even with 2 生; weekend: album yes, form no', () => {
     const deals = [{ date: '2026-10-27', person: '小布', isNewCustomer: true }, { date: '2026-10-27', person: '小布', isNewCustomer: true }];
     expect(calcDayFines({ ...base, roster: ['小布'], responses: [], deals, albumReports: new Map([['小布', 1]]) }, amt).map(x => x.reason)).toEqual(['form']);
-    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], albumReports: new Map() }, amt).map(x => x.reason)).toEqual(['album']);
-    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], albumReports: new Map([['小布', 1]]) }, amt)).toEqual([]);
-    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], leave: new Set(['小布']), albumReports: new Map() }, amt).map(x => x.reason)).toEqual(['album']);
+    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], deals: [{ date: '2026-10-25', person: '小布', isNewCustomer: true }], responses: [], albumReports: new Map() }, amt).map(x => x.reason)).toEqual(['album']);
+    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], deals: [{ date: '2026-10-25', person: '小布', isNewCustomer: true }], responses: [], albumReports: new Map([['小布', 1]]) }, amt)).toEqual([]);
+    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], deals: [{ date: '2026-10-25', person: '小布', isNewCustomer: true }], responses: [], leave: new Set(['小布']), albumReports: new Map() }, amt).map(x => x.reason)).toEqual(['album']);
   });
   it('form + album stack', () => {
     const deals = [{ date: '2026-10-27', person: '小布', isNewCustomer: true }, { date: '2026-10-27', person: '小布', isNewCustomer: true }];
@@ -50,6 +50,11 @@ describe('parsers', () => {
   it('form timestamp', () => expect(parseFormTimestamp('2026/10/28 下午 12:59:00').toISOString()).toBe('2026-10-28T04:59:00.000Z'));
 });
 
+describe('album only with 生', () => {
+  it('no 生 → no album fine even on weekend/leave', () => {
+    expect(calcDayFines({ day: '2026-10-25', roster: ['小布'], responses: [], deals: [], leave: new Set(['小布']), albumReports: new Map() }, amt)).toEqual([]);
+  });
+});
 describe('settlement text', () => {
   it('lists fines', () => expect(settlementTextBody('2026-10-27', ['小布'], ['尼莫'])).toBe('【制裁者｜結算 10/27】\n截止：今日 14:00\n• 小布 缺表單 $500\n• 尼莫 缺相簿 $500\n合計 2 筆｜$1,000'));
   it('all pass', () => expect(settlementTextBody('2026-10-27', [], [])).toBe('【制裁者｜結算 10/27】全員達標'));

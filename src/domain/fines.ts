@@ -13,11 +13,11 @@ export function requiredAlbums(deals: DealRow[], day: YMD): Map<string, number> 
   return m;
 }
 export const isWeekend = (day: YMD) => { const w = weekday(day); return w === 0 || w === 6; };
-/** 平日有上班（未休假/請假）者一律要交相簿：need = 生客數，無生客則 1。六日、休假／請假照樣要交相簿 */
+/** 當日生客表有「生」者才要交相簿：need = 生數；無生不用。六日、休假／請假有生照交 */
 export function albumNeeds(roster: string[], off: Set<string>, deals: DealRow[], day: YMD): Map<string, number> {
   const m = new Map<string, number>();
   const req = requiredAlbums(deals, day);
-  for (const p of roster) m.set(p, Math.max(req.get(p) ?? 0, 1));
+  for (const p of roster) { const n = req.get(p) ?? 0; if (n > 0) m.set(p, n); }
   return m;
 }
 /** 截止前有效、歸屬此業務日的表單 */
@@ -35,8 +35,8 @@ export function calcDayFines(i: DayInput, amt: Amounts, now = new Date()): Omit<
   const weekend = isWeekend(i.day); // 六日：表單免，相簿照罰
   for (const p of i.roster) {
     if (!weekend && !off.has(p) && worked(p) && !submitted.has(p)) out.push({ date: i.day, person: p, reason: 'form', amount: amt.form, createdAt: at });
-    const need = Math.max(req.get(p) ?? 0, 1); // 上班日一律要交；按一次＝回報完成
-    if (worked(p) && !(i.albumReports.get(p) ?? 0)) out.push({ date: i.day, person: p, reason: 'album', amount: amt.album, createdAt: at, note: `需 ${need}，回報 ${i.albumReports.get(p) ?? 0}` });
+    const need = req.get(p) ?? 0; // 有生才要交；按一次＝回報完成
+    if (need > 0 && !(i.albumReports.get(p) ?? 0)) out.push({ date: i.day, person: p, reason: 'album', amount: amt.album, createdAt: at, note: `需 ${need}，回報 ${i.albumReports.get(p) ?? 0}` });
   }
   return out;
 }
