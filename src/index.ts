@@ -1,11 +1,12 @@
 import express from 'express';
 import { middleware, webhook } from '@line/bot-sdk';
 import cron from 'node-cron';
-import { config, TZ } from './config';
+import { config, TZ, INITIAL_ROSTER } from './config';
+import { requiredAlbums, validResponses } from './domain/fines';
 import { addDays, toTaipeiYMD, deadlineOf, settlementDayFor } from './domain/time';
 import { HELP, parseAdmin } from './line/admin';
 import { lineClient, pushGroup } from './line/client';
-import { remindFlex, UPLOAD_ACTION } from './line/messages';
+import { remindChecklistFlex, UPLOAD_ACTION } from './line/messages';
 import { reader } from './sheets';
 import { Store } from './store';
 import { runSettlement } from './jobs/settlement';
@@ -35,7 +36,7 @@ async function handle(ev: webhook.Event) {
       const day = p.get('date') ?? yesterday;
       if (new Date() >= deadlineOf(settlementDayFor(day))) return reply(ev.replyToken!, `${day} 已過截止，回報不計（不可補交免罰）`);
       const person = store.personOf(uid);
-      if (!person) return reply(ev.replyToken!, '尚未綁定暱稱，請私訊官方帳號：綁定 你的暱稱');
+      if (!person) return reply(ev.replyToken!, '尚未綁定暱稱，請私訊制裁者：綁定 你的暱稱');
       store.addAlbum(day, person, uid);
       return reply(ev.replyToken!, `${person} ${day} 已記錄上傳 ${store.albumCounts(day).get(person)} 次`);
     }
@@ -58,6 +59,21 @@ app.post('/webhook', middleware({ channelSecret: config.lineSecret || 'dummy' })
   res.sendStatus(200);
 });
 // TODO: 提醒時間待定（暫訂 09:00 平日）
-cron.schedule('0 9 * * 1-5', () => { const y = addDays(toTaipeiYMD(new Date()), -1); pushGroup([remindFlex(y, '今天 13:00')]); }, { timezone: TZ });
+cron.schedule('0 9 * * 1-5', async () => {
+  const y = addDays(toTaipeiYMD(new Date()), -1);
+  try {
+    const [roster, responses, deals] = await Promise.all([reader.roster(), reader.formResponses(), reader.deals().catch(() => [])]);
+    const leave = store.leaveSet(y);
+    const valid = validResponses(responses, y);
+    const off = new Set([...leave, ...valid.filter(r => r.status === 'off').map(r => r.person)]);
+    const submitted = new Set(valid.filter(r => r.status === 'work').map(r => r.person));
+    const req = requiredAlbums(deals, y);
+    const people = (roster.length ? roster : INITIAL_ROSTER).map(person => {
+      if (off.has(person)) return { person, leave: true };
+      return { person, formOk: submitted.has(person), albumNeed: req.get(person) ?? 0 };
+    });
+    await pushGroup(remindChecklistFlex(y, people, '13:00'));
+  } catch (e) { console.error('remind failed', e); }
+}, { timezone: TZ });
 cron.schedule(config.cron, () => { runSettlement(store, reader).catch(console.error); }, { timezone: TZ });
 app.listen(config.port, () => console.log(`listening :${config.port} (sheets=${config.sheetsMode})`));
