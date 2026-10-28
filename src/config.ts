@@ -4,7 +4,10 @@ export const config = {
   port: Number(e.PORT ?? 3000),
   lineSecret: e.LINE_CHANNEL_SECRET ?? '',
   lineToken: e.LINE_CHANNEL_ACCESS_TOKEN ?? '',
+  /** 員工群：提醒清單 */
   groupId: e.LINE_GROUP_ID ?? '',
+  /** 罰款／結算群（漫威俱樂部）；空＝退回 groupId */
+  fineGroupId: e.LINE_FINE_GROUP_ID ?? '',
   adminIds: (e.ADMIN_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
   formSheetId: e.FORM_SPREADSHEET_ID ?? '1KFurA8rtYVr5KQaIeL5311vNUWwg1I17m_5WFzCLttg',
   dealSheetId: e.DEAL_SPREADSHEET_ID ?? '1p6egJnIlZuoizDNsAHMnG24wS9UiRkNTKGs9Oxb76zw',
