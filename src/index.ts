@@ -5,7 +5,7 @@ import { config, TZ, INITIAL_ROSTER, DEAL_SHEET } from './config';
 import { albumNeeds, validResponses } from './domain/fines';
 import { addDays, toTaipeiYMD, deadlineOf, settlementDayFor } from './domain/time';
 import { HELP, parseAdmin, albumCheckText, SET_DEAL_TAB_ACTION } from './line/admin';
-import { lineClient, pushGroup, pushAdmin } from './line/client';
+import { lineClient, pushGroup, pushAdmin, setFineGroupGetter, currentFineGroupId } from './line/client';
 import { toMD, remindChecklistFlex, dealTabPickerFlex, UPLOAD_ACTION } from './line/messages';
 import { reader, listDealTabs, setDealTabGetter, currentDealTab } from './sheets';
 import { Store } from './store';
@@ -13,6 +13,7 @@ import { runSettlement } from './jobs/settlement';
 
 const store = new Store();
 setDealTabGetter(() => store.getDealSheetTab() || DEAL_SHEET.tab);
+setFineGroupGetter(() => store.getFineGroupId() || config.fineGroupId);
 
 const app = express();
 const reply = (token: string, text: string) => lineClient.replyMessage({ replyToken: token, messages: [{ type: 'text', text }] });
@@ -30,10 +31,16 @@ async function handle(ev: webhook.Event) {
     console.log('[LINE] event', ev.type, 'sourceType=', src?.type, 'userId=', uid);
   }
   if (ev.type === 'join' && src?.groupId) {
-    console.log('[LINE] JOINED_GROUP', src.groupId);
+    console.log('========== [LINE] JOINED_GROUP groupId=' + src.groupId + ' ==========');
+    console.log('（若這是漫威俱樂部：設 LINE_FINE_GROUP_ID 或管理員私訊「罰款群 ' + src.groupId + '」）');
   }
   if (ev.type === 'memberJoined' && src?.groupId) {
-    console.log('[LINE] MEMBER_JOINED_IN_GROUP', src.groupId);
+    console.log('========== [LINE] MEMBER_JOINED_IN_GROUP groupId=' + src.groupId + ' ==========');
+  }
+  if (ev.type === 'message' && ev.message.type === 'text' && src?.groupId && ev.message.text.trim() === '設罰款群' && config.adminIds.includes(uid)) {
+    store.setFineGroupId(src.groupId);
+    console.log('========== [LINE] FINE_GROUP_SET groupId=' + src.groupId + ' ==========');
+    return reply(ev.replyToken!, '已設為罰款群（之後罰款／結算發這裡）');
   }
   const yesterday = addDays(toTaipeiYMD(new Date()), -1);
   if (ev.type === 'postback') {
@@ -79,6 +86,8 @@ async function handle(ev: webhook.Event) {
       return reply(ev.replyToken!, `已撤回 ${c.person} ${d} 相簿回報（${n} 筆）` + (fined ? `，已記相簿罰 ${config.fineAlbum}` : store.isSettled(d) ? '，該日已有相簿罰' : `，14:00 結算會罰 ${config.fineAlbum}`));
     }
     if (c.kind === 'list') { const fs = store.fines(c.date); return reply(ev.replyToken!, fs.map(f => `${f.date} ${f.person} ${f.reason} ${f.amount}`).join('\n') || '無紀錄'); }
+    if (c.kind === 'fine_group_get') return reply(ev.replyToken!, `罰款群：${currentFineGroupId() || '（未設定，退回員工群）'}`);
+    if (c.kind === 'fine_group_set') { store.setFineGroupId(c.groupId); console.log('========== [LINE] FINE_GROUP_SET groupId=' + c.groupId + ' =========='); return reply(ev.replyToken!, `罰款群已設為：${c.groupId}`); }
     if (c.kind === 'tab_set') {
       store.setDealSheetTab(c.tab);
       return reply(ev.replyToken!, `生客分頁已切到：${c.tab}`);

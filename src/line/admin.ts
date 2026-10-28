@@ -4,6 +4,8 @@ export type AdminCmd =
   | { kind: 'not_uploaded'; person: string; date?: string }
   | { kind: 'list'; date?: string }
   | { kind: 'tab_list' }
+  | { kind: 'fine_group_get' }
+  | { kind: 'fine_group_set'; groupId: string }
   | { kind: 'tab_set'; tab: string }
   | { kind: 'help' } | { kind: 'unknown'; text: string };
 const DATE = '(\\d{4}-\\d{2}-\\d{2}|\\d{1,2}\\/\\d{1,2})';
@@ -21,6 +23,8 @@ export function parseAdmin(text: string, year = new Date().getFullYear()): Admin
   const t = text.trim().replace(/\s+/g, ' ');
   let m;
   if (/^(說明|help|幫助)$/i.test(t)) return { kind: 'help' };
+  if (t === '罰款群') return { kind: 'fine_group_get' };
+  if ((m = t.match(/^罰款群 (C[0-9a-f]{32})$/i))) return { kind: 'fine_group_set', groupId: m[1] };
   if (t === '分頁') return { kind: 'tab_list' };
   if ((m = t.match(/^分頁 (.+)$/))) return { kind: 'tab_set', tab: m[1].trim() };
   if ((m = t.match(new RegExp(`^罰款清單(?: ${DATE})?$`)))) return { kind: 'list', date: normDate(m[1], year) };
@@ -30,6 +34,9 @@ export function parseAdmin(text: string, year = new Date().getFullYear()): Admin
   return { kind: 'unknown', text: t };
 }
 export const HELP = `管理員指令：
+罰款群 → 看目前罰款群 groupId
+罰款群 Cxxxx → 設定罰款群
+（在群組內傳「設罰款群」→ 把該群設為罰款群）
 請假 小布 [10/27]
 罰款 小布 500 [10/27] [備註]
 罰款清單 [10/27]
