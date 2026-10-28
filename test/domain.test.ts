@@ -1,4 +1,4 @@
-import { settlementTextBody } from '../src/line/messages';
+import { settlementTextBody, settlementsFromFines } from '../src/line/messages';
 import { describe, it, expect } from 'vitest';
 import { businessDaysToSettle, attributeSubmission } from '../src/domain/time';
 import { calcDayFines } from '../src/domain/fines';
@@ -58,4 +58,15 @@ describe('album only with 生', () => {
 describe('settlement text', () => {
   it('lists fines', () => expect(settlementTextBody('2026-10-27', ['小布'], ['尼莫'])).toBe('【制裁者｜結算 10/27】\n截止：今日 14:00\n• 小布 缺表單 $500\n• 尼莫 缺相簿 $500\n合計 2 筆｜$1,000'));
   it('all pass', () => expect(settlementTextBody('2026-10-27', [], [])).toBe('【制裁者｜結算 10/27】全員達標'));
+});
+
+describe('per-person fine text', () => {
+  it('one message per fine', () => {
+    const m = settlementsFromFines(['2026-10-27'], [
+      { id: '1', date: '2026-10-27', person: '菲柔', reason: 'album', amount: 500, createdAt: '' },
+      { id: '2', date: '2026-10-27', person: '小布', reason: 'form', amount: 500, createdAt: '' },
+    ] as any);
+    expect(m).toEqual([{ type: 'text', text: '菲柔\n14:00前未上傳成交相簿\n罰款500' }, { type: 'text', text: '小布\n14:00前未交表單\n罰款500' }]);
+  });
+  it('none', () => expect(settlementsFromFines(['2026-10-27'], [])).toEqual([{ type: 'text', text: '10/27 結算：全員達標，無罰款' }]));
 });

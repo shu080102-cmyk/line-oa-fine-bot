@@ -221,17 +221,16 @@ export function settlementText(days: YMD[], fines: Fine[]): messagingApi.Message
   return settlementFlex(day, formMissing, albumMissing);
 }
 
+/** 14:00 結算：每人每筆罰一則純文字（不用 Flex） */
+export function fineText(f: Pick<Fine, 'person' | 'reason' | 'amount'>): string {
+  const what = f.reason === 'form' ? '14:00前未交表單' : '14:00前未上傳成交相簿';
+  return `${f.person}\n${what}\n罰款${f.amount}`;
+}
+
 export function settlementsFromFines(days: YMD[], fines: Fine[]): messagingApi.Message[] {
   if (!days.length) return [];
-  return days.map(day => {
-    const dayFines = fines.filter(f => f.date === day);
-    const formMissing = [...new Set(dayFines.filter(f => f.reason === 'form').map(f => f.person))];
-    const albumMissing = dayFines.filter(f => f.reason === 'album').map(f => {
-      const m = f.note?.match(/需\s*(\d+)/);
-      return { person: f.person, need: m ? Number(m[1]) : 1 };
-    });
-    return settlementTextMessage(day, formMissing, albumMissing.map(a => a.person));
-  });
+  if (!fines.length) return [{ type: 'text', text: `${days.map(toMD).join('、')} 結算：全員達標，無罰款` }];
+  return fines.map(f => ({ type: 'text' as const, text: fineText(f) }));
 }
 
 /** 14:00 結算：純文字訊息（不用 Flex） */
