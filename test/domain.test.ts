@@ -1,3 +1,4 @@
+import { settlementTextBody } from '../src/line/messages';
 import { describe, it, expect } from 'vitest';
 import { businessDaysToSettle, attributeSubmission } from '../src/domain/time';
 import { calcDayFines } from '../src/domain/fines';
@@ -45,4 +46,9 @@ describe('parsers', () => {
     expect(parseAdmin('說明').kind).toBe('help');
   });
   it('form timestamp', () => expect(parseFormTimestamp('2026/10/28 下午 12:59:00').toISOString()).toBe('2026-10-28T04:59:00.000Z'));
+});
+
+describe('settlement text', () => {
+  it('lists fines', () => expect(settlementTextBody('2026-10-27', ['小布'], ['尼莫'])).toBe('【制裁者｜結算 10/27】\n截止：今日 14:00\n• 小布 缺表單 $500\n• 尼莫 缺相簿 $500\n合計 2 筆｜$1,000'));
+  it('all pass', () => expect(settlementTextBody('2026-10-27', [], [])).toBe('【制裁者｜結算 10/27】全員達標'));
 });

@@ -230,8 +230,23 @@ export function settlementsFromFines(days: YMD[], fines: Fine[]): messagingApi.M
       const m = f.note?.match(/需\s*(\d+)/);
       return { person: f.person, need: m ? Number(m[1]) : 1 };
     });
-    return settlementFlex(day, formMissing, albumMissing);
+    return settlementTextMessage(day, formMissing, albumMissing.map(a => a.person));
   });
+}
+
+/** 14:00 結算：純文字訊息（不用 Flex） */
+export function settlementTextBody(day: YMD, formMissing: string[], albumMissing: string[], fine = 500): string {
+  const md = toMD(day);
+  const head = `【制裁者｜結算 ${md}】`;
+  const lines: string[] = [];
+  for (const p of formMissing) lines.push(`• ${p} 缺表單 $${fine}`);
+  for (const p of [...new Set(albumMissing)]) lines.push(`• ${p} 缺相簿 $${fine}`);
+  if (!lines.length) return `${head}全員達標`;
+  return [head, '截止：今日 14:00', ...lines, `合計 ${lines.length} 筆｜$${(lines.length * fine).toLocaleString('en-US')}`].join('\n');
+}
+
+export function settlementTextMessage(day: YMD, formMissing: string[], albumMissing: string[]): messagingApi.Message {
+  return { type: 'text', text: settlementTextBody(day, formMissing, albumMissing) };
 }
 
 
