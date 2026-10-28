@@ -7,6 +7,7 @@ export type AdminCmd =
   | { kind: 'fine_group_get' }
   | { kind: 'fine_group_set'; groupId: string }
   | { kind: 'tab_set'; tab: string }
+  | { kind: 'header_set'; url: string } | { kind: 'header_clear' } | { kind: 'header_get' }
   | { kind: 'help' } | { kind: 'unknown'; text: string };
 const DATE = '(\\d{4}-\\d{2}-\\d{2}|\\d{1,2}\\/\\d{1,2})';
 export function normDate(s: string | undefined, year: number): string | undefined {
@@ -23,6 +24,9 @@ export function parseAdmin(text: string, year = new Date().getFullYear()): Admin
   const t = text.trim().replace(/\s+/g, ' ');
   let m;
   if (/^(說明|help|幫助)$/i.test(t)) return { kind: 'help' };
+  if (t === '頭圖') return { kind: 'header_get' };
+  if (t === '頭圖清除') return { kind: 'header_clear' };
+  if ((m = t.match(/^頭圖 (https:\/\/\S+)$/i))) return { kind: 'header_set', url: m[1] };
   if (t === '罰款群') return { kind: 'fine_group_get' };
   if ((m = t.match(/^罰款群 (C[0-9a-f]{32})$/i))) return { kind: 'fine_group_set', groupId: m[1] };
   if (t === '分頁') return { kind: 'tab_list' };
@@ -34,6 +38,9 @@ export function parseAdmin(text: string, year = new Date().getFullYear()): Admin
   return { kind: 'unknown', text: t };
 }
 export const HELP = `管理員指令：
+頭圖 → 看提醒卡頭圖網址
+頭圖 https://... → 換提醒卡頭圖（右側頭盔 plate）
+頭圖清除 → 恢復預設頭圖
 罰款群 → 看目前罰款群 groupId
 罰款群 Cxxxx → 設定罰款群
 （在群組內傳「設罰款群」→ 把該群設為罰款群）
