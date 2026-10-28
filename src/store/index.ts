@@ -1,7 +1,15 @@
 import fs from 'fs'; import path from 'path'; import { randomUUID } from 'crypto';
 import { config } from '../config';
 import { Fine, YMD } from '../domain/types';
-interface Data { albums: { date: YMD; person: string; userId: string; at: string }[]; leave: { date: YMD; person: string }[]; fines: Fine[]; settled: YMD[]; users: Record<string, string> }
+interface Data {
+  albums: { date: YMD; person: string; userId: string; at: string }[];
+  leave: { date: YMD; person: string }[];
+  fines: Fine[];
+  settled: YMD[];
+  users: Record<string, string>;
+  /** 生客表目前使用的分頁名；空＝用 env DEAL_SHEET_TAB */
+  dealSheetTab?: string;
+}
 const empty = (): Data => ({ albums: [], leave: [], fines: [], settled: [], users: {} });
 export class Store {
   private d: Data;
@@ -17,4 +25,6 @@ export class Store {
   fines(date?: YMD) { return date ? this.d.fines.filter(f => f.date === date) : this.d.fines; }
   isSettled(d: YMD) { return this.d.settled.includes(d); }
   markSettled(d: YMD) { this.d.settled.push(d); this.save(); }
+  getDealSheetTab() { return this.d.dealSheetTab; }
+  setDealSheetTab(tab: string) { this.d.dealSheetTab = tab; this.save(); }
 }
