@@ -100,7 +100,7 @@ app.post('/webhook', middleware({ channelSecret: config.lineSecret || 'dummy' })
   await Promise.all((req.body.events as webhook.Event[]).map(e => handle(e).catch(err => console.error(err))));
   res.sendStatus(200);
 });
-async function sendRemind(toAdmin = false) {
+async function sendRemind(adminOnly = false) {
   const y = addDays(toTaipeiYMD(new Date()), -1);
   const [roster, responses, deals] = await Promise.all([reader.roster(), reader.formResponses(), reader.deals().catch(() => [])]);
   const leave = store.leaveSet(y);
@@ -116,12 +116,14 @@ async function sendRemind(toAdmin = false) {
     const reported = albumDone.get(person) ?? 0;
     return { person, formOk: submitted.has(person), albumNeed: need, albumReported: reported };
   });
-  if (toAdmin) await pushAdmin([{ type: 'text', text: albumCheckText(toMD(y), req, albumDone, off) }]).catch(e => console.error('pushAdmin failed', e));
+  if (adminOnly) return pushAdmin([{ type: 'text', text: albumCheckText(toMD(y), req, albumDone, off) }]);
   await pushGroup(remindChecklistFlex(y, people, '14:00'));
 }
 // 12:00 / 13:00 提醒；14:00 只結算（不提醒）
-// 13:00 另私訊管理員相簿檢查清單
-cron.schedule('0 12 * * 1-5', () => { sendRemind().catch(e => console.error('remind failed', e)); }, { timezone: TZ });
-cron.schedule('0 13 * * 1-5', () => { sendRemind(true).catch(e => console.error('remind failed', e)); }, { timezone: TZ });
+for (const expr of ['0 12 * * 1-5', '0 13 * * 1-5']) {
+  cron.schedule(expr, () => { sendRemind().catch(e => console.error('remind failed', e)); }, { timezone: TZ });
+}
+// 13:30 私訊管理員相簿檢查清單（不推群）
+cron.schedule('30 13 * * 1-5', () => { sendRemind(true).catch(e => console.error('admin check failed', e)); }, { timezone: TZ });
 cron.schedule(config.cron, () => { runSettlement(store, reader).catch(console.error); }, { timezone: TZ });
 app.listen(config.port, () => console.log(`listening :${config.port} (sheets=${config.sheetsMode} dealTab=${currentDealTab()})`));

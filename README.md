@@ -53,5 +53,5 @@ Webhook：`POST https://<公開網址>/webhook`（本機可用 `ngrok http 3000`
 `src/domain`（純函式：時間、狀態、罰款）、`src/sheets`（介面＋stub＋google）、`src/store`（JSON）、`src/line`（client、Flex、管理指令）、`src/jobs/settlement.ts`。
 
 ## 相簿檢查（管理員私訊）
-- 平日 13:00 制裁者私訊 ADMIN_USER_IDS：「相簿檢查 | M/D」應交／已按上傳／尚未按。
+- 平日 13:30 制裁者私訊 ADMIN_USER_IDS：「相簿檢查 | M/D」應交／已按上傳／尚未按。
 - 檢查人核對實際相簿後，私訊 `未傳 暱稱 [10/27]`：撤回該人當日上傳回報；未結算則 14:00 自動罰，已結算則補記相簿罰 500（不重複）。

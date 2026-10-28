@@ -33,7 +33,7 @@ export const HELP = `管理員指令：
 請假 小布 [10/27]
 罰款 小布 500 [10/27] [備註]
 罰款清單 [10/27]
-未傳 小布 [10/27]（有按但沒真的傳相簿→撤回並罰）
+未傳 小布 [10/27]（13:30 會私訊相簿檢查；有按但沒真的傳→撤回並罰）
 分頁
 分頁 「MW2026-11」的副本
 說明
@@ -41,7 +41,7 @@ export const HELP = `管理員指令：
 
 export const SET_DEAL_TAB_ACTION = 'set_deal_tab';
 
-/** 13:00 私訊管理員的相簿檢查清單 */
+/** 13:30 私訊管理員的相簿檢查清單 */
 export function albumCheckText(md: string, need: Map<string, number>, reported: Map<string, number>, off: Set<string>): string {
   const ppl = [...need.entries()].filter(([p, n]) => n > 0 && !off.has(p));
   const pressed = ppl.filter(([p]) => (reported.get(p) ?? 0) > 0).map(([p]) => p);
