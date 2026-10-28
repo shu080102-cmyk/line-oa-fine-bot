@@ -18,10 +18,10 @@ describe('business day', () => {
 });
 describe('fines', () => {
   const base = { day: '2026-10-27', roster: ['小布','小玫','小紅'], deals: [], leave: new Set<string>(), albumReports: new Map<string, number>() };
-  it('missing form fined; 休假 and leave exempt', () => {
+  it('missing form fined; 休假 and leave exempt from form only', () => {
     const f = calcDayFines({ ...base, leave: new Set(['小紅']), responses: [{ timestamp: T('2026-10-27T20:00:00'), person: '小玫', status: 'off', rawStatus: '' }] }, amt);
-    expect([...new Set(f.map(x => x.person))]).toEqual(['小布']);
-    expect(f.map(x => x.reason).sort()).toEqual(['album','form']);
+    expect(f.filter(x => x.reason === 'form').map(x => x.person)).toEqual(['小布']);
+    expect(f.filter(x => x.reason === 'album').map(x => x.person).sort()).toEqual(['小布','小玫','小紅'].sort());
   });
   it('late submit still fined', () => {
     const f = calcDayFines({ ...base, roster: ['小布'], responses: [{ timestamp: T('2026-10-28T14:05:00'), person: '小布', status: 'work', rawStatus: '' }] }, amt);
@@ -32,7 +32,7 @@ describe('fines', () => {
     expect(calcDayFines({ ...base, roster: ['小布'], responses: [], deals, albumReports: new Map([['小布', 1]]) }, amt).map(x => x.reason)).toEqual(['form']);
     expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], albumReports: new Map() }, amt).map(x => x.reason)).toEqual(['album']);
     expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], albumReports: new Map([['小布', 1]]) }, amt)).toEqual([]);
-    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], leave: new Set(['小布']), albumReports: new Map() }, amt)).toEqual([]);
+    expect(calcDayFines({ ...base, day: '2026-10-25', roster: ['小布'], responses: [], leave: new Set(['小布']), albumReports: new Map() }, amt).map(x => x.reason)).toEqual(['album']);
   });
   it('form + album stack', () => {
     const deals = [{ date: '2026-10-27', person: '小布', isNewCustomer: true }, { date: '2026-10-27', person: '小布', isNewCustomer: true }];
