@@ -38,31 +38,43 @@ function bullet(text: string, color = '#333333'): FlexComponent {
   };
 }
 
-/** 早上／盤點：今日應交清單（版面比照成交小幫手，發送帳＝制裁者 OA） */
+/** 今日應交清單（制裁者 OA）：綠色 header＋截止 pill、每人一列、footer 只放待回報相簿者 */
 export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadline = '14:00'): messagingApi.Message[] {
   const md = toMD(day);
-  const rows: FlexComponent[] = people.map(p => {
+  const GREEN = '#06C755';
+  const OK = '#1E9E4A';
+  const NG = '#E53935';
+  const MUTED = '#AAAAAA';
+
+  const chip = (text: string, color: string): FlexComponent => ({
+    type: 'text', text, size: 'xs', color, align: 'end', flex: 0, margin: 'md',
+  });
+
+  const rows: FlexComponent[] = [];
+  people.forEach((p, i) => {
+    if (i > 0) rows.push({ type: 'separator', margin: 'md', color: '#F0F0F0' });
     if (p.leave) {
-      return {
-        type: 'box', layout: 'vertical', margin: 'md', contents: [
-          { type: 'text', text: p.person, weight: 'bold', size: 'sm' },
-          { type: 'text', text: '休假 ⏭', size: 'sm', color: '#888888', margin: 'xs' },
+      rows.push({
+        type: 'box', layout: 'horizontal', margin: 'md', alignItems: 'center', contents: [
+          { type: 'text', text: p.person, size: 'sm', color: MUTED, flex: 1 },
+          chip('休假', MUTED),
         ],
-      };
+      });
+      return;
     }
-    const form = p.formOk ? '表單 ✔' : '表單 ✘';
     const need = p.albumNeed ?? 0;
     const reported = p.albumReported ?? 0;
-    let album: string;
-    if (need <= 0) album = '無需相簿';
-    else if (reported > 0) album = `相簿 ✔（應交${need}張）`;
-    else album = `相簿 ${need}張`;
-    return {
-      type: 'box', layout: 'vertical', margin: 'md', contents: [
-        { type: 'text', text: p.person, weight: 'bold', size: 'sm' },
-        { type: 'text', text: `${form}　${album}`, size: 'sm', color: '#555555', margin: 'xs', wrap: true },
+    const album: FlexComponent =
+      need <= 0 ? chip('無需相簿', MUTED)
+      : reported > 0 ? chip('相簿 ✔', OK)
+      : chip(`相簿 ✘ ${need}張`, NG);
+    rows.push({
+      type: 'box', layout: 'horizontal', margin: 'md', alignItems: 'center', contents: [
+        { type: 'text', text: p.person, size: 'md', weight: 'bold', color: '#222222', flex: 1, wrap: true },
+        chip(p.formOk ? '表單 ✔' : '表單 ✘', p.formOk ? OK : NG),
+        album,
       ],
-    };
+    });
   });
 
   // 只有應交相簿且尚未回報的人有按鈕；label/displayText＝暱稱，別人按了 handler 會丟棄
@@ -70,49 +82,62 @@ export function remindChecklistFlex(day: YMD, people: PersonDayStatus[], deadlin
     p => !p.leave && (p.albumNeed ?? 0) > 0 && (p.albumReported ?? 0) <= 0,
   );
 
-  const mkBubble = (footerPeople: PersonDayStatus[], withHeader: boolean): FlexBubble => {
-    const footerContents: FlexComponent[] = footerPeople.map(p => ({
-      type: 'button',
-      style: 'primary',
-      color: '#2E7D32',
-      action: {
-        type: 'postback',
-        label: p.person.slice(0, 20),
-        data: `action=${UPLOAD_ACTION}&date=${day}&person=${encodeURIComponent(p.person)}`,
-        displayText: p.person,
+  const header = (sub: string): messagingApi.FlexBox => ({
+    type: 'box', layout: 'vertical', backgroundColor: GREEN, paddingAll: '20px', paddingBottom: '16px',
+    contents: [
+      { type: 'text', text: '制裁者', size: 'xxs', color: '#E8FFF0', weight: 'bold' },
+      {
+        type: 'box', layout: 'horizontal', margin: 'sm', alignItems: 'center', contents: [
+          { type: 'text', text: sub, size: 'xl', weight: 'bold', color: '#FFFFFF', flex: 1 },
+          { type: 'text', text: md, size: 'lg', weight: 'bold', color: '#FFFFFF', flex: 0 },
+        ],
       },
-    }));
+      {
+        type: 'box', layout: 'horizontal', margin: 'md', contents: [
+          {
+            type: 'box', layout: 'vertical', flex: 0, backgroundColor: '#FFFFFF', cornerRadius: '12px',
+            paddingStart: '10px', paddingEnd: '10px', paddingTop: '3px', paddingBottom: '3px',
+            contents: [{ type: 'text', text: `⏰ 截止 ${deadline}`, size: 'xs', color: '#05A346', weight: 'bold' }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const mkBubble = (footerPeople: PersonDayStatus[], withHeader: boolean): FlexBubble => {
+    const footerContents: FlexComponent[] = [];
     if (footerPeople.length) {
-      footerContents.push({ type: 'text', text: '應交相簿的人點自己的名字', size: 'xs', color: '#888888', align: 'center' });
+      footerContents.push({ type: 'text', text: '已上傳相簿 → 按自己的名字', size: 'sm', weight: 'bold', color: '#05A346', align: 'center' });
+      footerPeople.forEach(p => footerContents.push({
+        type: 'button',
+        style: 'primary',
+        color: GREEN,
+        height: 'sm',
+        action: {
+          type: 'postback',
+          label: `${p.person}　我已上傳`.slice(0, 20),
+          data: `action=${UPLOAD_ACTION}&date=${day}&person=${encodeURIComponent(p.person)}`,
+          displayText: p.person,
+        },
+      }));
+      footerContents.push({ type: 'text', text: '只按自己的名字，按別人的不算', size: 'xs', color: '#999999', align: 'center', margin: 'sm' });
     } else if (withHeader) {
-      footerContents.push({ type: 'text', text: '今日無需相簿回報', size: 'xs', color: '#888888', align: 'center' });
+      footerContents.push({ type: 'text', text: '今日無需相簿回報 🎉', size: 'xs', color: '#999999', align: 'center' });
     }
-    const bodyContents: FlexComponent[] = withHeader
-      ? [
-          {
-            type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '📋', flex: 0, size: 'lg' },
-              { type: 'text', text: `今日應交清單 | ${md}`, weight: 'bold', size: 'md', color: '#1B5E20', margin: 'sm', wrap: true },
-            ],
-          },
-          {
-            type: 'box', layout: 'horizontal', margin: 'md', contents: [
-              { type: 'text', text: '⏰', flex: 0, size: 'sm' },
-              { type: 'text', text: `截止 ${deadline}`, size: 'sm', color: '#666666', margin: 'sm' },
-            ],
-          },
-          sep(),
-          ...rows,
-        ]
-      : [
-          { type: 'text', text: '應交相簿（續）', weight: 'bold', size: 'sm', color: '#1B5E20' },
-        ];
     const bubble: FlexBubble = {
       type: 'bubble',
-      body: { type: 'box', layout: 'vertical', contents: bodyContents },
+      size: 'mega',
+      header: header(withHeader ? '今日應交清單' : '應交相簿（續）'),
+      body: {
+        type: 'box', layout: 'vertical', paddingAll: '20px', paddingTop: '12px',
+        contents: withHeader && rows.length
+          ? rows
+          : [{ type: 'text', text: '請以下同仁回報相簿', size: 'sm', color: '#666666' }],
+      },
+      styles: { footer: { separator: true, separatorColor: '#F0F0F0' } },
     };
     if (footerContents.length) {
-      bubble.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: footerContents };
+      bubble.footer = { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px', contents: footerContents };
     }
     return bubble;
   };
