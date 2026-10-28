@@ -11,7 +11,8 @@ describe('business day', () => {
   it('monday → fri..sun', () => expect(businessDaysToSettle('2026-11-02')).toEqual(['2026-10-30','2026-10-31','2026-11-01']));
   it('weekend → none', () => expect(businessDaysToSettle('2026-10-31')).toEqual([]));
   it('submission 12:59 next day counts for yesterday', () => expect(attributeSubmission(T('2026-10-28T12:59:00'))).toContain('2026-10-27'));
-  it('submission 13:00 does not', () => expect(attributeSubmission(T('2026-10-28T13:00:00'))).not.toContain('2026-10-27'));
+  it('submission 13:00 next day now counts for yesterday', () => expect(attributeSubmission(T('2026-10-28T13:00:00'))).toContain('2026-10-27'));
+  it('submission 14:00 does not', () => expect(attributeSubmission(T('2026-10-28T14:00:00'))).not.toContain('2026-10-27'));
   it('monday morning counts for fri', () => expect(attributeSubmission(T('2026-11-02T10:00:00'))).toContain('2026-10-30'));
 });
 describe('fines', () => {
@@ -21,7 +22,7 @@ describe('fines', () => {
     expect(f.map(x => x.person)).toEqual(['小布']);
   });
   it('late submit still fined', () => {
-    const f = calcDayFines({ ...base, roster: ['小布'], responses: [{ timestamp: T('2026-10-28T13:05:00'), person: '小布', status: 'work', rawStatus: '' }] }, amt);
+    const f = calcDayFines({ ...base, roster: ['小布'], responses: [{ timestamp: T('2026-10-28T14:05:00'), person: '小布', status: 'work', rawStatus: '' }] }, amt);
     expect(f).toHaveLength(1);
   });
   it('form + album stack', () => {
